@@ -401,10 +401,39 @@ public class KThread {
      * Tests whether this module is working.
      */
     public static void selfTest() {
-	Lib.debug(dbgThread, "Enter KThread.selfTest");
+		Lib.debug(dbgThread, "Enter KThread.selfTest");
 	
-	new KThread(new PingTest(1)).setName("forked thread").fork();
-	new PingTest(0).run();
+		new KThread(new PingTest(1)).setName("forked thread").fork();
+		new PingTest(0).run();
+
+		Alarm alarm = new Alarm(); // 알람 객체 생성
+
+		KThread thread1 = new KThread(new Runnable(){ // 임의의 스레드 생성
+			public void run() {
+				System.out.println("thread1 호출 전 시간(waitUnit() 메소드 호출 전) = " + Machine.timer().getTime());
+				alarm.waitUntil(400); // thread 내부에서 x만큼 슬립요청(여기서는 400)
+				System.out.println("thread1 호출 후 시간(x timer tick 지나고 wake-up) = " + Machine.timer().getTime());
+			}
+		}).setName("thread1");
+
+		KThread thread2 = new KThread(new Runnable(){ // 임의의 스레드 생성
+			public void run() {
+				System.out.println("thread2 호출 전 시간(waitUnit() 메소드 호출 전) = " + Machine.timer().getTime());
+				alarm.waitUntil(200); // thread 내부에서 x만큼 슬립요청(여기서는 200)
+				System.out.println("thread2 호출 후 시간(x timer tick 지나고 wake-up) = " + Machine.timer().getTime());
+			}
+		}).setName("thread2");
+
+		KThread thread3 = new KThread(new Runnable(){ // 임의의 스레드 생성
+			public void run() { // 슬립하지 않는 스레드 끼워넣기
+				System.out.println("thread3 호출 전 시간(waitUnit() 메소드 호출 전) = " + Machine.timer().getTime());
+				System.out.println("thread3 호출 후 시간(x timer tick 지나고 wake-up) = " + Machine.timer().getTime());
+			}
+		}).setName("thread3");
+
+		thread1.fork();
+		thread2.fork();
+		thread3.fork();
     }
 
     private static final char dbgThread = 't';
