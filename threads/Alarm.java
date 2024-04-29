@@ -23,8 +23,9 @@ public class Alarm {
 	    });
     }
 
-    private Vector<KThread> waitingThreadQueue = new Vector<>(); // block된 스레드들의 리스트를 만듦
-    private Vector<Long> waitingTimeQueue = new Vector<>(); // waitingQueue의 스레드들에 대응되는 대기시간 리스트
+    private Vector<KThread> waitingThreadQueue = new Vector<>(); // block된 스레드 리스트
+    private Vector<Long> wakeTimeQueue = new Vector<>(); // wakeTime 리스트
+
     /**
      * The timer interrupt handler. This is called by the machine's timer
      * periodically (approximately every 500 clock ticks). Causes the current
@@ -37,17 +38,17 @@ public class Alarm {
         boolean interruptStatus = Machine.interrupt().disable(); // 스레드의 인터럽트 비활성화
 
         Iterator<KThread> threadIterator = waitingThreadQueue.iterator();
-        Iterator<Long> timeIterator = waitingTimeQueue.iterator();
+        Iterator<Long> timeIterator = wakeTimeQueue.iterator();
 
         while (threadIterator.hasNext() && timeIterator.hasNext()) { // 다음 스레드가 있는 경우에만 반복문 진입
 
             KThread thread = threadIterator.next();
             long time = timeIterator.next();
 
-            if (time < nowTime) { // 대기 인터럽트의 waketime 지난 경우
+            if (time < nowTime) { // 대기큐에 있는 스레드의 wakeTime이 현재 시간보다 작은 경우
                 thread.ready(); // 조건을 만족하는 경우 해당 스레드는 ready 상태로 전이됨
                 threadIterator.remove(); // ready 상태로 세팅된 스레드는 대기 큐에서 제거
-                timeIterator.remove(); // ready 상태로 세팅된 스레드의 대기 시간도 큐에서 제거
+                timeIterator.remove(); // ready 상태로 세팅된 스레드의 wakeTime도 큐에서 제거
             }
         }
         KThread.currentThread().yield();
@@ -77,8 +78,8 @@ public class Alarm {
         long wakeTime = Machine.timer().getTime() + x; // 현재시간 + x = 스레드 깨어날 시간
         boolean interruptStatus = Machine.interrupt().disable(); // 스레드의 인터럽트 비활성화
 
-        waitingThreadQueue.addElement(KThread.currentThread()); // waitingQueue에 스레드 추가
-        waitingTimeQueue.add(wakeTime); // waitingTimeQueue에 대기시간 추가
+        waitingThreadQueue.addElement(KThread.currentThread()); // waitingThreadQueue에 스레드 추가
+        wakeTimeQueue.add(wakeTime); // wakeTimeQueue에 대기시간 추가
 
         KThread.currentThread().sleep(); // waitUntil 메소드를 호출한 현재 스레드를 block시킴
         Machine.interrupt().restore(interruptStatus); // 인터럽트 상태 복원
