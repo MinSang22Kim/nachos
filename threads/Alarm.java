@@ -18,9 +18,9 @@ public class Alarm {
      * alarm.
      */
     public Alarm() {
-	Machine.timer().setInterruptHandler(new Runnable() {
-		public void run() { timerInterrupt(); }
-	    });
+        Machine.timer().setInterruptHandler(new Runnable() {
+            public void run() { timerInterrupt(); }
+        });
     }
 
     private Vector<KThread> waitingThreadQueue = new Vector<>(); // block된 스레드 리스트
@@ -71,7 +71,7 @@ public class Alarm {
      */
 
     public void waitUntil(long x) {
-	    // for now, cheat just to get something working (busy waiting is bad)
+        // for now, cheat just to get something working (busy waiting is bad)
 
         if(x<=0) return; // x Timer tick이 0 또는 음수인 경우 기다리지 않고 즉시 반환
 
