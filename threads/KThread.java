@@ -2,6 +2,8 @@ package nachos.threads;
 
 import nachos.machine.*;
 
+import java.util.Vector;
+
 /**
  * A KThread is a thread that can be used to execute Nachos kernel code. Nachos
  * allows multiple threads to run concurrently.
@@ -186,14 +188,17 @@ public class KThread {
 
 		Machine.interrupt().disable();
 
+		while(!currentThread.joinThreadQueue.isEmpty()){
+			KThread thread = currentThread.joinThreadQueue.remove(0);
+			thread.ready();
+		}
+
 		Machine.autoGrader().finishingCurrentThread();
 
 		Lib.assertTrue(toBeDestroyed == null);
 		toBeDestroyed = currentThread;
 
-
 		currentThread.status = statusFinished;
-
 		sleep();
 	}
 
@@ -272,11 +277,50 @@ public class KThread {
 	 * call is not guaranteed to return. This thread must not be the current
 	 * thread.
 	 */
+
 	public void join() {
+
 		Lib.debug(dbgThread, "Joining to thread: " + toString());
+		Lib.assertTrue(this != currentThread,
+				"자기 자신에 대해 join() 메소드는 호출 불가합니다!");
 
-		Lib.assertTrue(this != currentThread);
+		Machine.interrupt().disable(); // 인터럽트 비활성화로 atomic하게 동작
 
+		if (status == statusFinished) { // 대상 스레드가 이미 종료된 경우 바로 리턴
+			return;
+		}
+
+		Lib.assertTrue(joinThreadQueue.size() != 1,
+				"해당 스레드에 대해 join() 메소드가 이미 호출되었습니다!");
+
+		joinThreadQueue.addElement(currentThread);
+		currentThread().sleep(); // 현재 스레드를 blocking
+
+		Machine.interrupt().enable(); // 인터럽트 복원
+	}
+
+	private static void joinTest1 () {
+		KThread child1 = new KThread( new Runnable () {
+			public void run() {
+				System.out.println("I (heart) Nachos!");
+			}
+		});
+
+		child1.setName("child1").fork();
+
+		// We want the child to finish before we call join.  Although
+		// our solutions to the problems cannot busy wait, our test
+		// programs can!
+
+		for (int i = 0; i < 5; i++) {
+			System.out.println ("busy...");
+			KThread.currentThread().yield();
+		}
+
+		child1.join(); // A.join()
+		System.out.println("After joining, child1 should be finished.");
+		System.out.println("is it? " + (child1.status == statusFinished));
+		Lib.assertTrue((child1.status == statusFinished), " Expected child1 to be finished.");
 	}
 
 	/**
@@ -403,37 +447,44 @@ public class KThread {
 	public static void selfTest() {
 		Lib.debug(dbgThread, "Enter KThread.selfTest");
 
-		new KThread(new PingTest(1)).setName("forked thread").fork();
-		new PingTest(0).run();
+		joinTest1();
 
-		Alarm alarm = new Alarm(); // 알람 객체 생성
-
-		KThread thread1 = new KThread(new Runnable(){ // 임의의 스레드 생성
+		KThread threadA = new KThread(new Runnable(){ // 임의의 스레드 생성
 			public void run() {
-				System.out.println("thread1 호출 전 시간(waitUnit() 메소드 호출 전) = " + Machine.timer().getTime());
-				alarm.waitUntil(400); // thread 내부에서 x만큼 슬립요청(여기서는 400)
-				System.out.println("thread1 호출 후 시간(x timer tick 지나고 wake-up) = " + Machine.timer().getTime());
-			}
-		}).setName("thread1");
 
-		KThread thread2 = new KThread(new Runnable(){ // 임의의 스레드 생성
-			public void run() {
-				System.out.println("thread2 호출 전 시간(waitUnit() 메소드 호출 전) = " + Machine.timer().getTime());
-				alarm.waitUntil(200); // thread 내부에서 x만큼 슬립요청(여기서는 200)
-				System.out.println("thread2 호출 후 시간(x timer tick 지나고 wake-up) = " + Machine.timer().getTime());
 			}
-		}).setName("thread2");
-
-		KThread thread3 = new KThread(new Runnable(){ // 임의의 스레드 생성
-			public void run() { // 슬립하지 않는 스레드 끼워넣기
-				System.out.println("thread3 호출 전 시간(waitUnit() 메소드 호출 전) = " + Machine.timer().getTime());
-				System.out.println("thread3 호출 후 시간(x timer tick 지나고 wake-up) = " + Machine.timer().getTime());
-			}
-		}).setName("thread3");
-
-		thread1.fork();
-		thread2.fork();
-		thread3.fork();
+		}).setName("threadA");
+//		new KThread(new PingTest(1)).setName("forked thread").fork();
+//		new PingTest(0).run();
+//
+//		Alarm alarm = new Alarm(); // 알람 객체 생성
+//
+//		KThread thread1 = new KThread(new Runnable(){ // 임의의 스레드 생성
+//			public void run() {
+//				System.out.println("thread1 호출 전 시간(waitUnit() 메소드 호출 전) = " + Machine.timer().getTime());
+//				alarm.waitUntil(400); // thread 내부에서 x만큼 슬립요청(여기서는 400)
+//				System.out.println("thread1 호출 후 시간(x timer tick 지나고 wake-up) = " + Machine.timer().getTime());
+//			}
+//		}).setName("thread1");
+//
+//		KThread thread2 = new KThread(new Runnable(){ // 임의의 스레드 생성
+//			public void run() {
+//				System.out.println("thread2 호출 전 시간(waitUnit() 메소드 호출 전) = " + Machine.timer().getTime());
+//				alarm.waitUntil(200); // thread 내부에서 x만큼 슬립요청(여기서는 200)
+//				System.out.println("thread2 호출 후 시간(x timer tick 지나고 wake-up) = " + Machine.timer().getTime());
+//			}
+//		}).setName("thread2");
+//
+//		KThread thread3 = new KThread(new Runnable(){ // 임의의 스레드 생성
+//			public void run() { // 슬립하지 않는 스레드 끼워넣기
+//				System.out.println("thread3 호출 전 시간(waitUnit() 메소드 호출 전) = " + Machine.timer().getTime());
+//				System.out.println("thread3 호출 후 시간(x timer tick 지나고 wake-up) = " + Machine.timer().getTime());
+//			}
+//		}).setName("thread3");
+//
+//		thread1.fork();
+//		thread2.fork();
+//		thread3.fork();
 	}
 
 	private static final char dbgThread = 't';
@@ -474,4 +525,7 @@ public class KThread {
 	private static KThread toBeDestroyed = null;
 	private static KThread idleThread = null;
 
+	// 추가적인 상태 변수
+	private boolean joined = false; // 이 스레드에 대해 join()이 호출되었는지 여부
+	private Vector<KThread> joinThreadQueue = new Vector<KThread>(); // 이 스레드를 대상으로 join()이 호출된 스레드
 }
